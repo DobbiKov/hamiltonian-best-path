@@ -64,6 +64,25 @@ impl Graph {
         })
     }
 
+    pub fn get_node(&self, id: usize) -> Arc<Node>{
+        self.nodes[id].clone()
+    }
+    pub fn get_edge(&self, id: usize) -> Arc<Edge>{
+        self.edges[id].clone()
+    }
+    pub fn get_availible_nodes_for_node(&self, node: Arc<Node>) -> Vec<Arc<Node>>{
+        self.connections[node.id].iter().map(|e| if node.id == e.left.id { e.right.clone() } else { e.left.clone() }).collect()
+    }
+
+    pub fn distance(&self, node1: Arc<Node>, node2: Arc<Node>) -> f32{
+        for conn in &self.connections[node1.id]{
+            if conn.left.id == node2.id || conn.right.id == node2.id{
+                return conn.weight
+            }
+        }
+        return 0.0; //TODO: option here?
+    }
+
     fn verify_node_edges_correctness(nodes: &[usize], edges: &[(usize, usize, f32)]) -> bool {
         //TODO: complete?
         //TODO no duplicats?
