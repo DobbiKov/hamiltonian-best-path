@@ -1,4 +1,5 @@
 use crate::errors::GraphCreationError;
+use rand::{Rng, RngExt};
 use std::{collections::HashMap, sync::Arc};
 
 #[derive(Eq, Hash, PartialEq)]
@@ -70,7 +71,7 @@ impl Graph {
     pub fn get_edge(&self, id: usize) -> Arc<Edge> {
         self.edges[id].clone()
     }
-    pub fn get_availible_nodes_for_node(&self, node: Arc<Node>) -> Vec<Arc<Node>> {
+    pub fn get_availible_nodes_for_node(&self, node: &Arc<Node>) -> Vec<Arc<Node>> {
         self.connections[node.id]
             .iter()
             .map(|e| {
@@ -82,6 +83,21 @@ impl Graph {
             })
             .collect()
     }
+    pub fn get_availible_nodes_with_dist_for_node(
+        &self,
+        node: &Arc<Node>,
+    ) -> Vec<(Arc<Node>, f32)> {
+        self.connections[node.id]
+            .iter()
+            .map(|e| {
+                if node.id == e.left.id {
+                    (e.right.clone(), e.weight)
+                } else {
+                    (e.left.clone(), e.weight)
+                }
+            })
+            .collect()
+    }
 
     pub fn distance(&self, node1: &Arc<Node>, node2: &Arc<Node>) -> Option<f32> {
         for conn in &self.connections[node1.id] {
@@ -89,7 +105,7 @@ impl Graph {
                 return Some(conn.weight);
             }
         }
-        return None;
+        None
     }
     pub fn delta(
         &self,
@@ -108,6 +124,63 @@ impl Graph {
             (Some(old1), Some(old2), Some(new1), Some(new2)) => Some(new1 + new2 - old1 - old2),
             _ => None,
         }
+    }
+
+    pub fn initial_path(&self) -> (Vec<Arc<Node>>, Vec<Arc<Node>>, Vec<Arc<Node>>) {
+        let mut visited = Vec::<Arc<Node>>::new();
+        let mut not_visited = self.nodes.clone();
+        let mut rng = rand::rng();
+        let rand_idx = rng.random_range(0..self.nodes.len());
+        let first = self.nodes[rand_idx].clone();
+
+        visited.push(first.clone());
+
+        let not_vis_idx = not_visited.iter().position(|e| e.id == first.id).unwrap(); // not_visited
+                                                                                      // is the
+                                                                                      // same as
+                                                                                      // nodes,
+                                                                                      // impossible
+                                                                                      // not to
+                                                                                      // find an
+                                                                                      // element
+
+        not_visited.remove(not_vis_idx);
+        let mut path = vec![first];
+        while !not_visited.is_empty() {
+            let mut best_next: Option<Arc<Node>> = None;
+            let mut best_dist: f32 = 0.0;
+            for (right, dist) in self.get_availible_nodes_with_dist_for_node(path.last().unwrap()) {
+                if visited.iter().find(|e| e.id == right.id).is_some() {
+                    // if right is in visited,
+                    // then we can't add it to
+                    // path – skip
+                    continue;
+                }
+                if best_next.is_none() {
+                    best_next = Some(right);
+                    best_dist = dist;
+                    continue;
+                }
+                if Graph::left_better_than_right_f32(dist, best_dist) {
+                    best_dist = dist;
+                    best_next = Some(right);
+                }
+            }
+            if best_next.is_none() {
+                break;
+            }
+
+            let next = best_next.unwrap();
+            path.push(next.clone());
+            not_visited.remove(not_visited.iter().position(|e| e.id == next.id).unwrap());
+            visited.push(next)
+        }
+        (path, visited, not_visited)
+    }
+
+    /// Helping function that defines if it is maximization or minimization problem
+    fn left_better_than_right_f32(left: f32, right: f32) -> bool {
+        left > right
     }
 
     fn verify_node_edges_correctness(nodes: &[usize], edges: &[(usize, usize, f32)]) -> bool {
