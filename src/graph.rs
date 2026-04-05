@@ -1,5 +1,5 @@
 use crate::errors::GraphCreationError;
-use rand::{Rng, RngExt};
+use rand::RngExt;
 use std::{collections::HashMap, sync::Arc};
 
 #[derive(Eq, Hash, PartialEq)]
