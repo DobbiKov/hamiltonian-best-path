@@ -178,9 +178,27 @@ impl Graph {
         (path, visited, not_visited)
     }
 
+    pub fn distance_to_path(&self, node: &Arc<Node>, path: &Vec<Arc<Node>>) -> Option<f32> {
+        let mut best_dist: Option<f32> = None;
+        for p_node in path {
+            let dist = self.distance(node, p_node);
+            if dist.is_none() {
+                continue;
+            }
+            if best_dist.is_none() {
+                best_dist = dist;
+                continue;
+            }
+            if Graph::left_better_than_right_f32(dist.unwrap(), best_dist.unwrap()) {
+                best_dist = dist
+            }
+        }
+        best_dist
+    }
+
     /// Helping function that defines if it is maximization or minimization problem
     fn left_better_than_right_f32(left: f32, right: f32) -> bool {
-        left > right
+        left > right // left > right then it is maximization problem
     }
 
     fn verify_node_edges_correctness(nodes: &[usize], edges: &[(usize, usize, f32)]) -> bool {
