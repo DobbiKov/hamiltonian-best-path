@@ -37,9 +37,10 @@ impl Graph {
 
         for idx in 0..nodes.len() {
             let node = Node { id: idx };
-            n_nodes[idx] = Arc::new(node);
-            real_ids[idx] = nodes[idx];
+            n_nodes.push(Arc::new(node));
+            real_ids.push(nodes[idx]);
             real_ids_to_local_ids.insert(nodes[idx], idx);
+            connections.push(Vec::<Arc<Edge>>::new());
         }
 
         for idx in 0..edges.len() {
@@ -51,10 +52,10 @@ impl Graph {
                 right: n_nodes[*local_right].clone(),
                 weight,
             };
-            n_edges[idx] = Arc::new(edge);
-
-            connections[*local_left].push(n_edges[*local_right].clone());
-            connections[*local_right].push(n_edges[*local_left].clone());
+            let a_e = Arc::new(edge);
+            n_edges.push(a_e.clone());
+            connections[*local_left].push(a_e.clone());
+            connections[*local_right].push(a_e);
         }
 
         Ok(Graph {
@@ -274,5 +275,30 @@ impl Graph {
             }
         }
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Graph; // import everything from the parent module
+
+    #[test]
+    fn test_simple_graph() {
+        let g = Graph::new(&[5, 8, 11], &[(5, 8, 1.5), (8, 11, 2.5)]).unwrap();
+
+        assert!(g.real_ids.contains(&5));
+        assert!(g.real_ids.contains(&8));
+        assert!(g.real_ids.contains(&11));
+
+        assert_eq!(g.nodes.len(), 3);
+        assert_eq!(g.edges.len(), 2);
+
+        let id_5 = g.real_ids.iter().position(|e| *e == 5).unwrap();
+        let id_8 = g.real_ids.iter().position(|e| *e == 8).unwrap();
+        let id_11 = g.real_ids.iter().position(|e| *e == 11).unwrap();
+
+        let node_5 = g.get_node(id_5);
+
+        assert_eq!(g.connections.len(), 3);
     }
 }
