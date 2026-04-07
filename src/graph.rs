@@ -198,6 +198,62 @@ impl Graph {
         best_dist
     }
 
+    fn find_idx_that_improve_path(&self, path: &Vec<Arc<Node>>) -> Option<(usize, usize)> {
+        let mut best_pair_idx: Option<(usize, usize)> = None;
+        let mut best_delta: Option<f32> = None;
+
+        for i in 0..path.len() - 3 {
+            for j in (i + 2)..path.len() - 1 {
+                let delta = self.delta(&path[i], &path[i + 1], &path[j], &path[j + 1]);
+                if delta.is_none() {
+                    continue;
+                }
+                if best_pair_idx.is_none() {
+                    best_pair_idx = Some((i, j));
+                    best_delta = delta;
+                    continue;
+                }
+                if best_delta.unwrap() != delta.unwrap()
+                    && !Graph::left_better_than_right_f32(delta.unwrap(), best_delta.unwrap())
+                {
+                    best_pair_idx = Some((i, j));
+                    best_delta = delta;
+                    continue;
+                }
+            }
+        }
+        best_pair_idx
+    }
+
+    fn improve_path(&self, path: Vec<Arc<Node>>) -> (Vec<Arc<Node>>, bool) {
+        let best_pair_idx: Option<(usize, usize)> = self.find_idx_that_improve_path(&path);
+        if best_pair_idx.is_none() {
+            return (path, false);
+        }
+
+        let (i, j) = best_pair_idx.unwrap();
+        let mut new_path = Vec::<Arc<Node>>::new();
+        for idx in 0..i + 1 {
+            new_path.push(path[idx].clone())
+        }
+        for idx in (i + 1..j + 1).rev() {
+            new_path.push(path[idx].clone());
+        }
+        for idx in (j + 1..path.len()) {
+            new_path.push(path[idx].clone())
+        }
+
+        (new_path, true)
+    }
+
+    fn improve_while_possible(&self, path: Vec<Arc<Node>>) -> Vec<Arc<Node>> {
+        let (mut new_path, mut changed) = self.improve_path(path);
+        while changed {
+            (new_path, changed) = self.improve_path(new_path);
+        }
+        new_path
+    }
+
     /// Helping function that defines if it is maximization or minimization problem
     fn left_better_than_right_f32(left: f32, right: f32) -> bool {
         left > right // left > right then it is maximization problem
