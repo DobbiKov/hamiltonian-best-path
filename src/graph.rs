@@ -254,6 +254,12 @@ impl Graph {
         new_path
     }
 
+    pub fn build_approx_best_path(&self) -> Vec<Arc<Node>> {
+        let (mut path, _, _) = self.initial_path();
+        path = self.improve_while_possible(path);
+        path
+    }
+
     /// Helping function that defines if it is maximization or minimization problem
     fn left_better_than_right_f32(left: f32, right: f32) -> bool {
         left > right // left > right then it is maximization problem
