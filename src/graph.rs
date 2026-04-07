@@ -6,6 +6,11 @@ use std::{collections::HashMap, sync::Arc};
 pub struct Node {
     id: usize,
 }
+impl Node {
+    pub fn get_id(&self) -> usize {
+        self.id
+    }
+}
 pub struct Edge {
     left: Arc<Node>,
     right: Arc<Node>,
