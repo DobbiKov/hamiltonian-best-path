@@ -178,6 +178,8 @@ impl Graph {
         (path, visited, not_visited)
     }
 
+    ///Calculates distance from a node to given path, returns None if there is no connections at
+    ///all from the node to the path.
     pub fn distance_to_path(&self, node: &Arc<Node>, path: &Vec<Arc<Node>>) -> Option<f32> {
         let mut best_dist: Option<f32> = None;
         for p_node in path {
