@@ -203,10 +203,15 @@ impl Graph {
         let mut best_pair_idx: Option<(usize, usize)> = None;
         let mut best_delta: Option<f32> = None;
 
-        for i in 0..path.len() - 3 {
-            for j in (i + 2)..path.len() - 1 {
+        let i_lim: usize = if path.len() >= 3 { path.len() - 3 } else { 0 };
+        for i in 0..i_lim {
+            let j_lim: usize = if path.len() >= 1 { path.len() - 1 } else { 0 };
+            for j in (i + 2)..j_lim {
                 let delta = self.delta(&path[i], &path[i + 1], &path[j], &path[j + 1]);
                 if delta.is_none() {
+                    continue;
+                }
+                if !Graph::left_better_than_right_f32(delta.unwrap(), 0.0) {
                     continue;
                 }
                 if best_pair_idx.is_none() {
@@ -215,7 +220,7 @@ impl Graph {
                     continue;
                 }
                 if best_delta.unwrap() != delta.unwrap()
-                    && !Graph::left_better_than_right_f32(delta.unwrap(), best_delta.unwrap())
+                    && Graph::left_better_than_right_f32(delta.unwrap(), best_delta.unwrap())
                 {
                     best_pair_idx = Some((i, j));
                     best_delta = delta;
@@ -286,6 +291,7 @@ mod tests {
     fn test_simple_graph() {
         let g = Graph::new(&[5, 8, 11], &[(5, 8, 1.5), (8, 11, 2.5)]).unwrap();
 
+        // real_ids contains all provided node ids
         assert!(g.real_ids.contains(&5));
         assert!(g.real_ids.contains(&8));
         assert!(g.real_ids.contains(&11));
@@ -293,12 +299,129 @@ mod tests {
         assert_eq!(g.nodes.len(), 3);
         assert_eq!(g.edges.len(), 2);
 
+        // resolve local indices from real ids
         let id_5 = g.real_ids.iter().position(|e| *e == 5).unwrap();
         let id_8 = g.real_ids.iter().position(|e| *e == 8).unwrap();
         let id_11 = g.real_ids.iter().position(|e| *e == 11).unwrap();
 
-        let node_5 = g.get_node(id_5);
+        // local ids are distinct
+        assert_ne!(id_5, id_8);
+        assert_ne!(id_8, id_11);
+        assert_ne!(id_5, id_11);
 
         assert_eq!(g.connections.len(), 3);
+
+        // connections: node 5 and 11 each touch 1 edge; node 8 touches both
+        assert_eq!(g.connections[id_5].len(), 1);
+        assert_eq!(g.connections[id_8].len(), 2);
+        assert_eq!(g.connections[id_11].len(), 1);
+
+        // get_node returns a node with the correct local id
+        let node_5 = g.get_node(id_5);
+        let node_8 = g.get_node(id_8);
+        let node_11 = g.get_node(id_11);
+        assert_eq!(node_5.id, id_5);
+        assert_eq!(node_8.id, id_8);
+        assert_eq!(node_11.id, id_11);
+
+        // get_edge returns edges with the expected weights
+        // edges are stored in insertion order: (5,8,1.5) then (8,11,2.5)
+        assert_eq!(g.get_edge(0).weight, 1.5);
+        assert_eq!(g.get_edge(1).weight, 2.5);
+
+        // get_availible_nodes_for_node
+        let neighbors_5 = g.get_availible_nodes_for_node(&node_5);
+        assert_eq!(neighbors_5.len(), 1);
+        assert_eq!(neighbors_5[0].id, id_8);
+
+        let neighbors_11 = g.get_availible_nodes_for_node(&node_11);
+        assert_eq!(neighbors_11.len(), 1);
+        assert_eq!(neighbors_11[0].id, id_8);
+
+        let neighbors_8 = g.get_availible_nodes_for_node(&node_8);
+        assert_eq!(neighbors_8.len(), 2);
+        let neighbor_ids: Vec<usize> = neighbors_8.iter().map(|n| n.id).collect();
+        assert!(neighbor_ids.contains(&id_5));
+        assert!(neighbor_ids.contains(&id_11));
+
+        // get_availible_nodes_with_dist_for_node
+        let neighbors_8_dist = g.get_availible_nodes_with_dist_for_node(&node_8);
+        assert_eq!(neighbors_8_dist.len(), 2);
+        let has_5_with_1_5 = neighbors_8_dist
+            .iter()
+            .any(|(n, d)| n.id == id_5 && *d == 1.5);
+        let has_11_with_2_5 = neighbors_8_dist
+            .iter()
+            .any(|(n, d)| n.id == id_11 && *d == 2.5);
+        assert!(has_5_with_1_5);
+        assert!(has_11_with_2_5);
+
+        // distance
+        assert_eq!(g.distance(&node_5, &node_8), Some(1.5));
+        assert_eq!(g.distance(&node_8, &node_5), Some(1.5)); // symmetric
+        assert_eq!(g.distance(&node_8, &node_11), Some(2.5));
+        assert_eq!(g.distance(&node_5, &node_11), None); // no direct edge
+
+        // delta: swapping (5->8, 8->11) into (5->8, 8->11) — same pairs — yields 0.0
+        let d = g.delta(&node_5, &node_8, &node_8, &node_11);
+        assert_eq!(d, Some(0.0));
+
+        // delta returns None when a required edge does not exist
+        let d_none = g.delta(&node_5, &node_11, &node_8, &node_11);
+        assert_eq!(d_none, None);
+
+        // distance_to_path: best (max) reachable distance from node_5 to [node_8, node_11]
+        // distance(5,8)=1.5, distance(5,11)=None → best = 1.5
+        let path_8_11 = vec![node_8.clone(), node_11.clone()];
+        assert_eq!(g.distance_to_path(&node_5, &path_8_11), Some(1.5));
+
+        // distance_to_path: node_8 reaches node_5 (1.5) and node_11 (2.5) → best = 2.5
+        let path_5_11 = vec![node_5.clone(), node_11.clone()];
+        assert_eq!(g.distance_to_path(&node_8, &path_5_11), Some(2.5));
+
+        // distance_to_path returns None when no connection exists to any path node
+        let path_only_5 = vec![node_5.clone()];
+        assert_eq!(g.distance_to_path(&node_11, &path_only_5), None);
+
+        // build_approx_best_path visits all nodes exactly once
+        let path = g.build_approx_best_path();
+        assert_eq!(path.len(), 3);
+        let path_ids: Vec<usize> = path.iter().map(|n| n.id).collect();
+        assert!(path_ids.contains(&id_5));
+        assert!(path_ids.contains(&id_8));
+        assert!(path_ids.contains(&id_11));
+    }
+
+    #[test]
+    fn test_invalid_edge_returns_error() {
+        // edge references node id 99 which is not in the node list
+        let result = Graph::new(&[5, 8], &[(5, 99, 1.0)]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_approx_best_path_complete_graph() {
+        // 4-node complete graph: every node is connected to every other,
+        // so initial_path always visits all 4 nodes regardless of starting point.
+        let g = Graph::new(
+            &[0, 1, 2, 3],
+            &[
+                (0, 1, 1.0),
+                (0, 2, 2.0),
+                (0, 3, 3.0),
+                (1, 2, 4.0),
+                (1, 3, 5.0),
+                (2, 3, 6.0),
+            ],
+        )
+        .unwrap();
+
+        let path = g.build_approx_best_path();
+
+        // path visits all 4 nodes exactly once
+        assert_eq!(path.len(), 4);
+        let mut ids: Vec<usize> = path.iter().map(|n| n.id).collect();
+        ids.sort();
+        assert_eq!(ids, vec![0, 1, 2, 3]);
     }
 }
