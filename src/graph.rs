@@ -66,13 +66,18 @@ impl Graph {
         })
     }
 
-    pub fn get_node(&self, id: usize) -> Arc<Node> {
+    /// Returns real (initial) id for given node (local id)
+    pub fn get_real_id(&self, id: usize) -> usize {
+        self.real_ids[id]
+    }
+
+    fn get_node(&self, id: usize) -> Arc<Node> {
         self.nodes[id].clone()
     }
-    pub fn get_edge(&self, id: usize) -> Arc<Edge> {
+    fn get_edge(&self, id: usize) -> Arc<Edge> {
         self.edges[id].clone()
     }
-    pub fn get_availible_nodes_for_node(&self, node: &Arc<Node>) -> Vec<Arc<Node>> {
+    fn get_availible_nodes_for_node(&self, node: &Arc<Node>) -> Vec<Arc<Node>> {
         self.connections[node.id]
             .iter()
             .map(|e| {
@@ -84,10 +89,7 @@ impl Graph {
             })
             .collect()
     }
-    pub fn get_availible_nodes_with_dist_for_node(
-        &self,
-        node: &Arc<Node>,
-    ) -> Vec<(Arc<Node>, f32)> {
+    fn get_availible_nodes_with_dist_for_node(&self, node: &Arc<Node>) -> Vec<(Arc<Node>, f32)> {
         self.connections[node.id]
             .iter()
             .map(|e| {
@@ -100,7 +102,7 @@ impl Graph {
             .collect()
     }
 
-    pub fn distance(&self, node1: &Arc<Node>, node2: &Arc<Node>) -> Option<f32> {
+    fn distance(&self, node1: &Arc<Node>, node2: &Arc<Node>) -> Option<f32> {
         for conn in &self.connections[node1.id] {
             if conn.left.id == node2.id || conn.right.id == node2.id {
                 return Some(conn.weight);
@@ -108,7 +110,7 @@ impl Graph {
         }
         None
     }
-    pub fn delta(
+    fn delta(
         &self,
         pair1_left: &Arc<Node>,
         pair1_right: &Arc<Node>,
@@ -127,7 +129,7 @@ impl Graph {
         }
     }
 
-    pub fn initial_path(&self) -> (Vec<Arc<Node>>, Vec<Arc<Node>>, Vec<Arc<Node>>) {
+    fn initial_path(&self) -> (Vec<Arc<Node>>, Vec<Arc<Node>>, Vec<Arc<Node>>) {
         let mut visited = Vec::<Arc<Node>>::new();
         let mut not_visited = self.nodes.clone();
         let mut rng = rand::rng();
@@ -181,7 +183,7 @@ impl Graph {
 
     ///Calculates distance from a node to given path, returns None if there is no connections at
     ///all from the node to the path.
-    pub fn distance_to_path(&self, node: &Arc<Node>, path: &Vec<Arc<Node>>) -> Option<f32> {
+    fn distance_to_path(&self, node: &Arc<Node>, path: &Vec<Arc<Node>>) -> Option<f32> {
         let mut best_dist: Option<f32> = None;
         for p_node in path {
             let dist = self.distance(node, p_node);
